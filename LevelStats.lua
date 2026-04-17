@@ -71,12 +71,10 @@ local function OnLogin(event, player)
     end, 1200, 1)
 end
 
-local function OnChat(event, player, message, type, lang)
-    -- This handles the command regardless of whether it's typed in /say, /whisper, or /party
-    if (message:lower() == ".bonus") then
+local function OnCommand(event, player, code)
+    -- This hook triggers specifically when someone types a dot (.) command
+    if (code:lower() == "bonus") then
         local guid = player:GetGUIDLow()
-        
-        -- Query the database for the current totals
         local Q = CharDBQuery(string.format("SELECT str, agi, sta, `int`, spi FROM custom_level_stats WHERE guid = %d", guid))
         
         player:SendBroadcastMessage("|cffFFFF00--- Total Level Up Bonuses ---|r")
@@ -87,14 +85,24 @@ local function OnChat(event, player, message, type, lang)
                 player:SendBroadcastMessage(string.format("|cff%s%s:|r +%d", Config.Stats[i].color, Config.Stats[i].name, statTotal))
             end
         else
-            player:SendBroadcastMessage("No bonuses found in the database for your character.")
+            player:SendBroadcastMessage("No bonuses found.")
         end
 
-        -- Returning 'false' is critical: it prevents the "Table not found" or 
-        -- "Unknown command" error from showing up in the chat log.
+        -- Returning false tells the core: "This command is handled, don't say 'Command doesn't exist'"
         return false
     end
 end
+
+-- Hook for .commands (Event 42)
+RegisterPlayerEvent(42, OnCommand) 
+
+-- Keep the old chat hook as a backup for !bonus or just bonus
+local function OnChat(event, player, message, type, lang)
+    if (message:lower() == "!bonus" or message:lower() == "bonus") then
+        OnCommand(42, player, "bonus")
+        return false
+    end
+end
+RegisterPlayerEvent(18, OnChat)
 RegisterPlayerEvent(3, OnLogin)       
 RegisterPlayerEvent(13, OnLevelChange) 
-RegisterPlayerEvent(18, OnChat)

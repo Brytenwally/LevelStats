@@ -70,39 +70,49 @@ local function OnLogin(event, player)
         SyncStatsFromDB(player)
     end, 1200, 1)
 end
-
 local function OnCommand(event, player, code)
-    -- This hook triggers specifically when someone types a dot (.) command
     if (code:lower() == "bonus") then
-        local guid = player:GetGUIDLow()
+        -- In many Eluna builds, 'GetSelection()' is used instead of 'GetSelectedUnit()'
+        local target = player:GetSelection()
+        local targetPlayer = player -- Default to self
+        
+        -- Check if target exists AND is a player
+        if (target and target:ToPlayer()) then
+            targetPlayer = target:ToPlayer()
+        end
+
+        local guid = targetPlayer:GetGUIDLow()
+        local name = targetPlayer:GetName()
+        local isSelf = (player:GetGUIDLow() == guid)
+
+        -- Database Query
         local Q = CharDBQuery(string.format("SELECT str, agi, sta, `int`, spi FROM custom_level_stats WHERE guid = %d", guid))
         
-        player:SendBroadcastMessage("|cffFFFF00--- Total Level Up Bonuses ---|r")
+        -- Header
+        if isSelf then
+            player:SendBroadcastMessage("|cffFFFF00--- Your Level Up Bonuses ---|r")
+        else
+            player:SendBroadcastMessage(string.format("|cffFFFF00--- %s's Level Up Bonuses ---|r", name))
+        end
         
         if Q then
             for i = 0, 4 do
                 local statTotal = Q:GetUInt32(i)
+                -- Accessing the global Config table from your main LevelStats script
                 player:SendBroadcastMessage(string.format("|cff%s%s:|r +%d", Config.Stats[i].color, Config.Stats[i].name, statTotal))
             end
         else
-            player:SendBroadcastMessage("No bonuses found.")
+            if isSelf then
+                player:SendBroadcastMessage("You haven't gained any bonuses yet.")
+            else
+                player:SendBroadcastMessage(string.format("%s hasn't gained any bonuses yet.", name))
+            end
         end
 
-        -- Returning false tells the core: "This command is handled, don't say 'Command doesn't exist'"
-        return false
+        return false 
     end
 end
 
--- Hook for .commands (Event 42)
-RegisterPlayerEvent(42, OnCommand) 
-
--- Keep the old chat hook as a backup for !bonus or just bonus
-local function OnChat(event, player, message, type, lang)
-    if (message:lower() == "!bonus" or message:lower() == "bonus") then
-        OnCommand(42, player, "bonus")
-        return false
-    end
-end
-RegisterPlayerEvent(18, OnChat)
+RegisterPlayerEvent(42, OnCommand)
 RegisterPlayerEvent(3, OnLogin)       
 RegisterPlayerEvent(13, OnLevelChange) 
